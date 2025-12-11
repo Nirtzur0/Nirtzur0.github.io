@@ -1,0 +1,536 @@
+---
+title: "Modeling Atmospheric Turbulence with Linear Acoustics"
+author: "Your Name"
+date: today
+categories: [atmosphere, acoustics, modeling]
+draft: true
+---
+
+A Simple Turbulence Model for Linear Acoustics and a Basis for a Ray‑Tracing Algorithm
+
+(following and extending the Hebrew notes you sent)
+
+⸻
+
+Abstract
+
+We derive a simple statistical model for the effect of atmospheric turbulence on the phase of an acoustic wave and show how to turn it into a practical ray‑tracing algorithm. The model treats the sound speed as a sum of a deterministic part, obtained from temperature and humidity, and a small stochastic part due to turbulent temperature fluctuations. Under a weak‑fluctuation (first‑order Rytov / small‑perturbation) approximation, the phase of a monochromatic signal along a ray can be written as a path integral over these fluctuations. We then introduce a “block” turbulence model with a single correlation length and derive closed‑form expressions for the phase variance and its temporal correlation. Finally, we show how those formulas map directly into a Monte‑Carlo ray‑tracing algorithm suitable for a numerical “turbulent raytracer” project.
+
+⸻
+
+1. Physical setting and assumptions
+
+We are interested in sound propagation in the atmospheric boundary layer (near‑ground atmosphere), where temperature and wind are turbulent and cause random fluctuations in the acoustic field. A huge literature exists on this problem, usually framed in terms of random media and the Rytov approximation for weak turbulence. ￼
+
+To keep the model simple and close to your notes, we adopt:
+	1.	Linear acoustics, narrowband signal
+A scalar pressure field p(\mathbf{x}, t) at angular frequency \omega = 2\pi f.
+	2.	Deterministic mean atmosphere
+Mean temperature T(\mathbf{x}), specific humidity q(\mathbf{x}), and hence a mean sound speed \bar{c}(\mathbf{x}).
+	3.	Small, random sound‑speed fluctuations
+Turbulence introduces a random component \delta c(\mathbf{x}, t) with zero mean and variance related to the temperature variance \sigma_T^2.
+	4.	Weak turbulence / first‑order theory
+Phase fluctuations are small enough that we can linearize in \delta c. This is the same regime where classical Rytov theory is valid. ￼
+	5.	Geometrical acoustics for the mean field
+Rays are traced in the mean sound‑speed field \bar{c}(\mathbf{x}). Turbulence only modifies phase (and, in more advanced models, amplitude) along those rays. ￼
+
+⸻
+
+2. Deterministic ray acoustics
+
+2.1 Travel time along a ray
+
+Consider a ray that leaves a source at position \mathbf{x}_0 and arrives at \mathbf{x} along a path parameterized by arc length l\in[0,L] with position \mathbf{r}(l). Neglecting turbulence for the moment, the travel time (group delay) is
+
+\tau = \int_{0}^{L} \frac{\mathrm{d}l}{\bar{c}(\mathbf{r}(l))}.
+\tag{1}
+
+For a strictly homogeneous medium \bar{c} = \text{const}, this reduces to \tau = L/\bar{c}. In a stratified atmosphere with \bar{c} = \bar{c}(z), the ray path must be computed from Snell’s law or more general eikonal equations. ￼
+
+2.2 Phase of a monochromatic wave
+
+A monochromatic acoustic signal at the receiver can be written as
+
+s(t) = A\, e^{i\omega t} e^{i\phi(t)},
+
+where A is a slowly varying amplitude and \phi(t) is the phase perturbation due to propagation. If the source emits a continuous wave with reference phase zero, then in the mean atmosphere
+
+\phi_{\text{det}} = \omega \tau
+= \omega \int_{0}^{L} \frac{\mathrm{d}l}{\bar{c}(\mathbf{r}(l))}.
+\tag{2}
+
+So far everything is deterministic: a classic ray tracer for acoustics would compute ray paths and travel times from \bar{c}(\mathbf{x}) and then set the phase according to Eq. (2).
+
+⸻
+
+3. Sound speed in moist air
+
+3.1 Ideal‑gas formula
+
+For an ideal gas, the speed of sound is
+
+c = \sqrt{\gamma \frac{p}{\rho}} = \sqrt{\gamma R_\text{spec} T},
+\tag{3}
+
+where \gamma is the heat capacity ratio, R_\text{spec} the specific gas constant, and T the absolute temperature. ￼
+
+For dry air at sea level, Eq. (3) with \gamma \approx 1.4 and R_\text{spec} \approx 287\ \mathrm{J\,kg^{-1}K^{-1}} yields c\approx 343\ \mathrm{m/s} at T=293.15\ \mathrm{K} (20°C). ￼
+
+3.2 Moisture correction
+
+In the atmospheric boundary layer, humidity slightly increases the speed of sound. Sonic anemometer theory gives an empirically accurate expression for the acoustic temperature, which effectively folds humidity into the sound speed: ￼
+
+c^2 = \gamma R T (1 + 0.51\,q),
+\tag{4}
+
+where
+	•	T is the true air temperature [K],
+	•	q is the specific humidity (mass of water vapor per unit mass of moist air),
+	•	R is the gas constant for dry air, and
+	•	\gamma is the ratio of specific heats for air.
+
+This is exactly the expression that appears in your notes (their Eq. (9)). We will take
+
+\bar{c}(\mathbf{x}) = \sqrt{\gamma R T(\mathbf{x})\bigl(1 + 0.511\,q(\mathbf{x})\bigr)}
+\tag{5}
+
+as the deterministic sound speed, following Schotanus et al. and later sonic‑anemometer work. ￼
+
+⸻
+
+4. Decomposing the sound speed: deterministic + stochastic
+
+We model the total sound speed as
+
+c(\mathbf{r}, t) = \bar{c}(\mathbf{r}) + \delta c(\mathbf{r}, t),
+\tag{6}
+
+with
+	•	\bar{c}(\mathbf{r}) given by Eq. (5),
+	•	\delta c a zero‑mean random fluctuation caused primarily by turbulent temperature variations.
+
+In your notes this is written (their Eq. (3)) as
+
+c(t) = \langle c(t)\rangle + \delta c(t),
+
+which is the same idea but with time as the argument.
+
+We will assume weak turbulence, meaning that
+
+|\delta c| \ll \bar{c}
+
+(typically less than about 10% in magnitude), so that we can expand quantities to first order in \delta c. This corresponds to a small Rytov variance regime. ￼
+
+⸻
+
+5. Phase fluctuations due to turbulence
+
+5.1 Travel‑time and phase including fluctuations
+
+With the decomposition (6), the travel time becomes a random variable
+
+\tau = \int_0^L \frac{\mathrm{d}l}{\bar{c}(\mathbf{r}(l)) + \delta c(\mathbf{r}(l), t)}.
+
+Define the phase along the ray as
+
+\phi(t) = \omega \tau
+= 2\pi f \int_0^{L} \frac{\mathrm{d}l}{\bar{c}(\mathbf{r}(l)) + \delta c(\mathbf{r}(l), t)}.
+\tag{7}
+
+This matches your Eq. (5) (up to notation and integration limits).
+
+5.2 Linearization in \delta c
+
+For |\delta c| \ll \bar{c} we expand
+
+\frac{1}{\bar{c}+\delta c}
+= \frac{1}{\bar{c}}\frac{1}{1+\delta c/\bar{c}}
+\approx \frac{1}{\bar{c}}\left(1 - \frac{\delta c}{\bar{c}}\right),
+\tag{8}
+
+dropping terms of order (\delta c/\bar{c})^2. Substituting (8) into (7):
+
+\begin{aligned}
+\phi(t)
+&\approx 2\pi f \int_0^{L} \frac{\mathrm{d}l}{\bar{c}(\mathbf{r}(l))}
+- 2\pi f \int_0^{L} \frac{\delta c(\mathbf{r}(l),t)}{\bar{c}^2(\mathbf{r}(l))}\,\mathrm{d}l \\
+&= \phi_{\text{det}} + \phi_{\text{stoch}}(t),
+\end{aligned}
+\tag{9}
+
+with
+
+\phi_{\text{det}} = 2\pi f \int_0^{L} \frac{\mathrm{d}l}{\bar{c}(\mathbf{r}(l))},
+\qquad
+\phi_{\text{stoch}}(t) = - 2\pi f \int_0^{L} \frac{\delta c(\mathbf{r}(l),t)}{\bar{c}^2(\mathbf{r}(l))}\,\mathrm{d}l .
+\tag{10}
+
+These are the “deterministic” and “stochastic” parts (your Eq. (7)). The first term is exactly Eq. (2); the second term carries all the turbulent randomness.
+
+The mean phase is simply \langle\phi\rangle = \phi_{\text{det}} since \langle \delta c \rangle = 0. The main quantity of interest is the phase variance
+
+\sigma_\phi^2 = \mathrm{Var}[\phi(t)] = \left\langle \phi_{\text{stoch}}^2(t) \right\rangle.
+
+5.3 Linking \delta c to temperature fluctuations
+
+From Eq. (5),
+
+\bar{c}(T,q) = \sqrt{\gamma R T(1+0.511 q)}.
+
+Differentiating with respect to T:
+
+\frac{\partial \bar{c}}{\partial T}
+= \frac{1}{2}
+\frac{\gamma R(1+0.511q)}{\sqrt{\gamma R T(1+0.511q)}}
+= \frac{1}{2}\,\sqrt{\frac{\gamma R(1+0.511q)}{T}}.
+\tag{11}
+
+If turbulent fluctuations in humidity are small compared to temperature fluctuations (a decent approximation for many near‑surface situations ￼), we treat q as constant and write
+
+\delta c(\mathbf{r}, t)
+\approx \frac{\partial \bar{c}}{\partial T}\,\delta T(\mathbf{r}, t)
+= \frac{1}{2}\,\sqrt{\frac{\gamma R(1+0.511q)}{T(\mathbf{r})}}\,\delta T(\mathbf{r}, t).
+\tag{12}
+
+Your notes then approximate \delta T by a standard deviation \sigma_T and effectively replace \delta T by its RMS magnitude in the phase variance calculation. Their Eq. (10) corresponds to taking
+
+\delta c_\mathrm{rms} \equiv \sigma_c
+= \sigma_T\,\left|\frac{\partial \bar{c}}{\partial T}\right|
+= \sigma_T\,\frac{1}{2\sqrt{T(\mathbf{r})}},
+\tag{13}
+
+where the last equality uses Eqs. (11) and (5) to cancel the dependence on \gamma R(1+0.511 q).
+
+Substituting Eq. (13) into Eq. (10) (your Eq. (8)) gives the RMS phase due to turbulence:
+
+\sigma_\phi = 2\pi f
+\left\langle
+\left(\int_0^{L} \frac{\delta c}{\bar{c}^2}\,\mathrm{d}l\right)^2
+\right\rangle^{1/2}
+\approx -2\pi f \int_0^{L}
+\frac{\sigma_c(l)}{\bar{c}^2(l)}\,\mathrm{d}l.
+\tag{14}
+
+Using (13),
+
+\sigma_\phi \approx -2\pi f
+\int_0^{L}
+\frac{\sigma_T(l)}{2\bar{c}^2(l)\sqrt{T(l)}}\,\mathrm{d}l.
+\tag{15}
+
+This is essentially your Eq. (12).
+
+⸻
+
+6. Simplification for a homogeneous path
+
+To get a closed‑form expression, your notes assume that along the path:
+	•	\bar{c}(l) \approx c = \text{const},
+	•	T(l) \approx \bar{T} = \text{const},
+	•	\sigma_T(l) \approx \sigma_T = \text{const}.
+
+Then Eq. (15) simplifies to
+
+\sigma_\phi \approx -2\pi f \frac{\sigma_T}{2 c^2\sqrt{\bar{T}}}
+\int_0^{L} \mathrm{d}l
+= -2\pi f \frac{\sigma_T}{2 c^2\sqrt{\bar{T}}}\,L.
+\tag{16}
+
+However, this treats all turbulent contributions as perfectly correlated along the whole path, which is unrealistic. In a turbulent flow, temperature fluctuations decorrelate beyond some correlation length l_c (sometimes related to the integral length scale or outer scale). ￼
+
+To account for this, your derivation switches to computing the variance from a two‑point correlation integral. Starting from Eq. (10),
+
+\sigma_\phi^2
+= (2\pi f)^2
+\int_0^{L}\int_0^{L}
+\frac{\langle \delta c(l_1)\delta c(l_2)\rangle}
+{\bar{c}^2(l_1)\bar{c}^2(l_2)}\,\mathrm{d}l_1\mathrm{d}l_2.
+\tag{17}
+
+In the homogeneous approximation,
+
+\sigma_\phi^2
+\approx (2\pi f)^2
+\frac{1}{4c^4\bar{T}}
+\int_0^{L}\int_0^{L}
+\langle \delta T(l_1)\delta T(l_2)\rangle\,\mathrm{d}l_1\mathrm{d}l_2.
+\tag{18}
+
+This is your Eq. (14) up to notation.
+
+⸻
+
+7. Block‑model turbulence and correlation length
+
+7.1 Block model
+
+Instead of using a full Kolmogorov spectrum (which would lead to power‑law scalings like L^{5/3} for phase variance ￼), your notes adopt a block model:
+	•	The path is divided into “blocks” of length l_c.
+	•	Within a block, δT is perfectly correlated.
+	•	Different blocks are uncorrelated.
+
+Formally, the normalized correlation of some generic quantity u(z) is approximated as (your Eq. (17))
+
+\frac{\langle u(z)u(z+\delta z)\rangle}{\langle u(z)\rangle^2}
+\approx
+\begin{cases}
+1, & 0 < \delta z < l_c,\\
+0, & \text{else}.
+\end{cases}
+\tag{19}
+
+Under this model, the double integral in Eq. (18) becomes (your Eq. (16) and (18))
+
+\int_0^{L}\int_0^{L}
+\langle \delta T(l_1)\delta T(l_2)\rangle\,\mathrm{d}l_1\mathrm{d}l_2
+\approx \sigma_T^2\,L\,l_c.
+\tag{20}
+
+Intuitively: along a path of length L there are roughly L/l_c independent turbulent “cells”, each of size l_c. The variance scales like the number of cells times the variance per cell times l_c^2; after some algebra this yields L l_c.
+
+7.2 Final expression for phase RMS
+
+Substituting (20) into (18):
+
+\sigma_\phi^2
+\approx (2\pi f)^2
+\frac{1}{4c^4\bar{T}}\,\sigma_T^2 L l_c,
+
+or
+
+\sigma_\phi
+\approx 2\pi f
+\frac{\sigma_T}{2c^2\sqrt{\bar{T}}}\,\sqrt{L l_c}.
+\tag{21}
+
+This is your Eq. (19), except that (1) I’ve dropped the minus sign, since a standard deviation is non‑negative, and (2) I’ve made the dependence on \sigma_T and l_c explicit.
+
+7.3 Numerical example (from your notes)
+
+Using the values:
+	•	central frequency f = 120 n\ \mathrm{Hz}, n\in\mathbb{N},
+	•	c = 343\ \mathrm{m/s},
+	•	path length L = 2500\ \mathrm{m},
+	•	mean temperature \bar{T} = 283.15\ \mathrm{K} (10°C),
+	•	temperature RMS \sigma_T = 1\ \mathrm{K},
+	•	correlation length l_c = 5\ \mathrm{m},
+
+Eq. (21) gives (your Eq. (21))
+
+\sigma_\phi \approx 0.0213\,n\ \text{radians}.
+\tag{22}
+
+So each independent turbulent “cell” contributes about 0.0213n rad RMS at the n-th harmonic of 120\ \mathrm{Hz}.
+
+This scaling \sigma_\phi \propto f \sqrt{L} is qualitatively consistent with more sophisticated models based on temperature structure parameters C_T^2 and Kolmogorov turbulence, though the exact exponent on L can differ (often L^{5/6} or L^{1/2} depending on regime). ￼
+
+⸻
+
+8. Temporal correlation and turbulence cycles
+
+8.1 Taylor’s frozen‑turbulence hypothesis
+
+To relate spatial correlation (length l_c) to temporal correlation at a fixed receiver, we use Taylor’s frozen‑turbulence hypothesis: the turbulent pattern is advected past the observer at some mean flow speed U without changing significantly. ￼
+
+Under this hypothesis, a separation \delta z = U\tau in space corresponds to a time lag \tau. For an exponential spatial correlation, we might write
+
+\langle \phi_{\text{stoch}}(t)\,\phi_{\text{stoch}}(t+\tau) \rangle
+= \sigma_\phi^2\,\exp\!\left(-\frac{U|\tau|}{l_c}\right).
+\tag{23}
+
+Your notes (Eq. (22)) write essentially the same thing, though the minus sign in the exponent appears to have been dropped in the handwriting. Physically the correlation must decay with time lag, so the exponent should be negative.
+
+Substituting Eq. (21) gives a more explicit formula (your Eq. (23)):
+
+\langle \phi(t)\phi(t+\tau) \rangle
+\approx
+\frac{4\pi^2 f^2}{c^2}\;
+\frac{\sigma_T^2}{4c^2 \bar{T}}\;L l_c\;
+\exp\!\left(-\frac{U|\tau|}{l_c}\right).
+\tag{24}
+
+8.2 Number of independent turbulence cycles
+
+Define the turbulence correlation time
+
+\tau_\text{turb} = \frac{l_c}{U}.
+\tag{25}
+
+Over a total observation time T, the number of roughly independent turbulent realizations is then
+
+m_{\text{turb}} = \frac{T}{\tau_\text{turb}} = T\frac{U}{l_c}.
+\tag{26}
+
+That’s your Eq. (24). Using U=1\ \mathrm{m/s}, l_c = 5\ \mathrm{m}, for example, \tau_\text{turb}=5\,\mathrm{s} (your Eq. (25)). For a 120‑s recording, m_{\text{turb}} \approx 24 independent “turbulence cycles”.
+
+If we define \sigma_\phi^{(1)} as the RMS phase per independent cycle (Eq. (22)), then over m_{\text{turb}} cycles the RMS phase accumulated in a time‑averaged sense scales like
+
+\sigma_{\phi,\,\text{tot}} \sim \sigma_\phi^{(1)}\sqrt{m_{\text{turb}}}
+
+if cycles are statistically independent (random‑walk scaling). Your notes instead multiply directly (Eq. (26)):
+
+\sigma_{\phi,\,\text{tot}} \approx 0.0213n \times 24 \approx 0.51 n\ \text{rad}.
+\tag{27}
+
+This multiplication implicitly assumes perfect coherence of the contributions over time, which is somewhat stronger than what Eq. (23) suggests. For a conservative estimate (upper bound on fluctuations), that’s fine; for a more realistic model you might want the \sqrt{m_{\text{turb}}} scaling.
+
+⸻
+
+9. From theory to a ray‑tracing algorithm
+
+Now we turn all this math into something you can implement: a stochastic raytracer for acoustics in a turbulent atmosphere. The idea is:
+	1.	Use deterministic ray tracing to compute ray paths and travel times in the mean atmosphere \bar{c}(\mathbf{x}).
+	2.	Along each ray, sample random phase fluctuations according to the model above (block model with correlation length l_c, temperature RMS \sigma_T).
+	3.	Combine many realizations (Monte Carlo) to get statistics of the received field.
+
+9.1 Inputs
+
+At minimum, your code needs:
+	•	Environmental fields on a grid
+	•	Mean temperature T(\mathbf{x})
+	•	Specific humidity q(\mathbf{x})
+	•	(Optionally) mean wind field \mathbf{U}(\mathbf{x}) for refraction, and a single advection speed U for turbulence.
+	•	Turbulence statistics
+	•	Temperature RMS \sigma_T(\mathbf{x}) (or equivalently temperature variance).
+	•	Correlation length l_c(\mathbf{x}) (you can start with a constant).
+	•	Signal parameters
+	•	Source position \mathbf{x}_0.
+	•	Set of receiver positions \mathbf{x}_r.
+	•	Frequency f (or a small set of discrete frequencies).
+
+You can later upgrade \sigma_T and l_c to be computed from measured or modeled temperature structure parameters C_T^2(z). ￼
+
+9.2 Step 1: build the mean sound‑speed field
+
+On your grid, compute
+
+\bar{c}(\mathbf{x}) = \sqrt{\gamma R T(\mathbf{x})(1+0.511\,q(\mathbf{x}))}
+\tag{28}
+
+using Eq. (5).
+
+You may also precompute
+
+\beta(\mathbf{x}) \equiv \frac{1}{2\bar{c}^2(\mathbf{x})\sqrt{T(\mathbf{x})}},
+\tag{29}
+
+so the local contribution to phase variance is easy to evaluate.
+
+9.3 Step 2: deterministic ray tracing
+
+You can choose how sophisticated to be here:
+	•	Simplest: straight rays (no refraction) if you only care about moderate ranges and weak vertical gradients.
+	•	Stratified, range‑independent atmosphere: \bar{c} = \bar{c}(z) only; use Snell’s law.
+	•	Full 2D/3D ray tracing: integrate the geometrical acoustics equations
+\frac{\mathrm{d}}{\mathrm{d}s}\!\left(\frac{1}{\bar{c}}\,\frac{\mathrm{d}\mathbf{r}}{\mathrm{d}s}\right)
+= \nabla\!\left(\frac{1}{\bar{c}}\right),
+\tag{30}
+where s is arc length. ￼
+
+For each ray:
+	1.	Integrate from source \mathbf{x}_0 until you intersect the receiver location (or a small neighborhood).
+	2.	Store the polyline \mathbf{r}_k and segment lengths \Delta l_k for k = 1,\dots,N.
+	3.	Compute the deterministic travel time
+\tau_{\text{det}} = \sum_{k=1}^{N} \frac{\Delta l_k}{\bar{c}_k},\quad
+\bar{c}_k = \bar{c}(\mathbf{r}_k),
+\tag{31}
+and deterministic phase
+\phi_{\text{det}} = \omega \tau_{\text{det}}.
+\tag{32}
+
+9.4 Step 3: sampling turbulent phase along a ray
+
+We now discretize the integral in Eq. (10) using the block model. Choose a block size
+
+\Delta l \approx l_c
+
+(or smaller if you want finer resolution). For each block k:
+	1.	Evaluate environment at the block center \mathbf{r}_k:
+	•	\bar{c}_k = \bar{c}(\mathbf{r}_k)
+	•	T_k = T(\mathbf{r}_k)
+	•	\sigma_{T,k} = \sigma_T(\mathbf{r}_k).
+	2.	Compute the local sensitivity coefficient
+K_k = - 2\pi f\;\frac{1}{2\bar{c}_k^2\sqrt{T_k}}
+= - 2\pi f\,\beta_k.
+\tag{33}
+This matches Eq. (15).
+	3.	Draw a random temperature fluctuation for that block
+\delta T_k \sim \mathcal{N}(0,\sigma_{T,k}^2)
+\tag{34}
+(Gaussian with zero mean and given variance).
+	4.	Compute the stochastic phase increment for that block:
+\Delta \phi_k = K_k\,\delta T_k\,\Delta l.
+\tag{35}
+	5.	Sum over blocks to get the random phase for this realization of turbulence:
+\phi_{\text{stoch}} = \sum_{k=1}^{N_\text{blk}} \Delta \phi_k.
+\tag{36}
+
+This Monte‑Carlo construction is consistent with the analytical variance: because the \delta T_k are independent,
+
+\mathrm{Var}[\phi_{\text{stoch}}]
+= \sum_k K_k^2 \sigma_{T,k}^2 (\Delta l)^2
+\approx (2\pi f)^2 \frac{\sigma_T^2}{4c^4 \bar{T}}\,L l_c,
+
+which is essentially Eq. (21) for homogeneous conditions.
+
+9.5 Step 4: building the complex field at the receiver
+
+For each realization j of the turbulent field:
+	1.	Compute \phi_{\text{stoch}}^{(j)} using Eq. (36).
+	2.	Combine with deterministic phase:
+\phi^{(j)} = \phi_{\text{det}} + \phi_{\text{stoch}}^{(j)}.
+\tag{37}
+	3.	Assign a complex amplitude for that realization:
+s^{(j)} = A\, e^{i\phi^{(j)}},
+\tag{38}
+where A can incorporate geometric spreading, boundary reflections, etc., from your deterministic ray tracer.
+
+After M realizations you can estimate:
+	•	mean complex field: \langle s\rangle \approx \frac{1}{M}\sum_j s^{(j)},
+	•	phase variance: \sigma_\phi^2 \approx \mathrm{Var}\bigl(\arg s^{(j)}\bigr),
+	•	coherence between different rays or sensors, etc.
+
+9.6 Option: time series and temporal correlation
+
+If you want a time series s(t) at the receiver rather than just independent snapshots:
+	1.	At t=0, generate a random field of \delta T along the ray.
+	2.	At each time step \Delta t, advect this field by a distance U\Delta t along the path (wrap around or generate new turbulence at the upwind end).
+	3.	Recompute \phi_{\text{stoch}}(t) from the shifted field and update s(t).
+
+Under Taylor’s hypothesis this will produce a temporal correlation roughly of the form (23):
+
+\langle \phi_{\text{stoch}}(t)\phi_{\text{stoch}}(t+\tau)\rangle
+\approx \sigma_\phi^2 e^{-U|\tau|/l_c}.
+
+This is the kind of model used in more advanced work on acoustic phase statistics in turbulence. ￼
+
+⸻
+
+10. Limitations and possible extensions
+
+Your original derivation and the algorithm above are deliberately simple, which is good for a first raytracer, but there are important limitations to keep in mind:
+	1.	Single‑scale turbulence (block model)
+Real atmospheric turbulence has a spectrum of scales that often follows Kolmogorov k^{-5/3} statistics between inner and outer scales. Using a single correlation length l_c is crude; more realistic models use structure functions and structure parameters C_T^2 or C_n^2. ￼
+	2.	Weak‑fluctuation regime only
+The linearization (8) assumes phase fluctuations are sufficiently small (Rytov variance \ll 1). For long paths or high frequencies this may break down; higher‑order Rytov or full wave simulations (parabolic equation, FDTD) are then needed. ￼
+	3.	No amplitude fluctuations or scattering
+Our model only perturbs phase along a deterministic ray. In reality, turbulence also causes amplitude scintillation and scattering off the ray (angle‑of‑arrival fluctuations). ￼
+You can extend the algorithm later by including random amplitude factors or by tracing many slightly perturbed rays.
+	4.	Simple humidity treatment
+We held humidity q constant when relating \delta c to \delta T. For some environments (e.g., marine boundary layer) humidity fluctuations can matter; you can include them by extending Eq. (12) to include \partial c/\partial q. ￼
+	5.	Assumed isotropy and homogeneity
+The block model assumes isotropic, homogeneous turbulence along the path. Real boundary‑layer turbulence can be highly anisotropic (different scales in vertical and horizontal directions) and strongly height‑dependent. ￼
+
+Despite these caveats, the model is a solid, physically motivated starting point. Many published numerical studies of sound propagation through turbulence use conceptually similar steps—generate a random medium with prescribed statistics, then trace rays or solve a parabolic wave equation through it. ￼
+
+⸻
+
+11. Summary
+	•	We took your Hebrew notes and re‑derived the key equations in a clean way, starting from the travel‑time integral and a decomposition c = \bar{c} + \delta c.
+	•	Using the sonic anemometer relation c^2=\gamma R T(1+0.51q) we related sound‑speed fluctuations to temperature fluctuations and obtained an expression for turbulent phase in terms of a line integral of \delta T.
+	•	With a simple block‑correlation model and correlation length l_c, we derived a compact formula
+\sigma_\phi \approx 2\pi f\,\frac{\sigma_T}{2c^2\sqrt{\bar{T}}}\,\sqrt{L l_c},
+which matches your numerical example and is consistent with more sophisticated theories in the weak‑fluctuation regime.
+	•	We then translated this into a ray‑tracing algorithm where deterministic rays are traced in the mean sound‑speed field and stochastic phase increments are sampled along each ray according to the local turbulence statistics.
+
+This gives you a mathematically grounded, implementable blueprint for your “turbulent raytracer” project. When you’re ready, we can go step‑by‑step through coding the ray integrator and the Monte‑Carlo phase sampling, or extend the model to include amplitude scintillation and more realistic turbulence spectra.
